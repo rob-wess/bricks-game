@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script
+    src="https://code.jquery.com/jquery-3.7.1.min.js"
+    integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+    crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <title>Document</title>
+    <link rel="stylesheet"  href="/style.css">
+</head>
+<body>
+    <div class="wrapper">
+        <div class="count-track">
+            <p id="count">0 moves</p>
+        </div>
+        <div class="canvas-wrapper">
+            <canvas id="game-canvas" width="600" height="600">
+            </canvas>
+        </div>
+    </div>
+</body>
+
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        var level_data =<%-JSON.stringify(blocks)%>        
+        const {blocks,
+            defaultSquareColor,
+            visitedSquareColor,
+            gridBorderColor,
+            gridBorderColorVisited,
+            ballStartX,
+            ballStartY,
+            rows,
+            columns
+        } = level_data
+        
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+    
+        const squareSize = 50;
+        const cols = columns
+        canvas.width = cols * squareSize;
+        canvas.height = rows * squareSize;
+
+        let moveCount = 0;
+        let ballX = parseInt(ballStartX);
+        let ballY = parseInt(ballStartY);
+        const visited = new Set();
+        let moveInterval = null;
+        const moveSpeed = 25;
+        let currentDirection = null;
+        let allowDirectionChange = true;  // Flag to control direction change
+    
+        function isBlock(x, y) {
+            console.log('Is Block?: ' + x +"," + y )
+            return blocks.some(block => block.x === x && block.y === y);
+        }
+    
+        function handleMovement() {
+            let newX = ballX;
+            let newY = ballY;
+    
+            switch (currentDirection) {
+                case 'ArrowLeft': newX--; break;
+                case 'ArrowRight': newX++; break;
+                case 'ArrowUp': newY--; break;
+                case 'ArrowDown': newY++; break;
+            }
+    
+            if (newX < 0 || newX >= cols || newY < 0 || newY >= rows || isBlock(newX, newY)) {
+                clearInterval(moveInterval);
+                moveInterval = null;
+                currentDirection = null;
+                allowDirectionChange = true;  // Re-enable direction change
+                checkCompletion();
+            } else {
+                ballX = newX;
+                ballY = newY;
+                visited.add(`${ballX},${ballY}`);
+                redraw();
+            }
+        }
+
+        function checkCompletion() {
+            if (visited.size === rows * cols - blocks.length) { // Adjust for blocks
+
+                // Get current level number
+                const current_level = new URLSearchParams(window.location.search).get('level');
+                const next_level = parseInt(current_level) + 1
+
+            Swal.fire({
+                title: `Level ${current_level} complete in ${moveCount} moves!`,
+                icon: "success",
+                showCancelButton: true,
+                confirmButtonColor: "#3085d6",
+                cancelButtonColor: "#d33",
+                cancelButtonText: `Play level ${current_level} again?`,
+                confirmButtonText: `Next Level: ${next_level.toString()}`
+                }).then(function(isConfirm) {
+                    window.location.assign(`/bricks?level=${next_level}`)
+                })
+            }
+        }
+
+        function updateCountTracker(num) {
+            document.getElementById('count').textContent = `${num.toString()} moves`
+            return
+        }
+    
+        function handleKeydown(event) {
+            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+            if (allowDirectionChange && (currentDirection !== event.key || !moveInterval)) {
+                //console.log(`Key pressed: ${event.key}, starting move`); // Log at the start of a new movement
+                moveCount = moveCount + 1
+                updateCountTracker(moveCount)
+                currentDirection = event.key;
+                if (!moveInterval) {
+                    moveInterval = setInterval(handleMovement, moveSpeed);
+                }
+                allowDirectionChange = false;  // Disable new direction changes
+            }
+        }
+    
+        document.addEventListener('keydown', handleKeydown);
+
+        function drawBlock(x, y) {
+            const bx = x * squareSize;
+            const by = y * squareSize;
+            ctx.fillStyle = '#e8e8e8'; // Block color
+            ctx.fillRect(bx, by, squareSize, squareSize);
+        }
+    
+        function drawGrid() {
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    const x = j * squareSize;
+                    const y = i * squareSize;
+                    ctx.fillStyle = visited.has(`${j},${i}`) ? visitedSquareColor : defaultSquareColor; // Visited color or gradient
+                    ctx.fillRect(x, y, squareSize, squareSize);
+                    //ctx.strokeStyle = gridBorderColor; // Set border color here
+                    ctx.strokeStyle = visited.has(`${j},${i}`) ? gridBorderColorVisited : gridBorderColor; // Visited color or gradient
+                    ctx.lineWidth = 0.5; // Set border width here
+                    ctx.strokeRect(x, y, squareSize, squareSize); // Add border to square
+                }
+            }
+            blocks.forEach(block => drawBlock(block.x, block.y));
+        }
+    
+        function drawFireBall(column, row) {
+            const x = column * squareSize + squareSize / 2;
+            const y = row * squareSize + squareSize / 2;
+            const radius = squareSize / 2;
+    
+            const ballGradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+            ballGradient.addColorStop(0.2, '#ee82ee');
+            ballGradient.addColorStop(0.4, '#0ff');
+            ballGradient.addColorStop(1, 'transparent');
+    
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#fff';
+            ctx.fillStyle = ballGradient;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur = 0; // Reset shadow for other elements
+        }
+    
+        function redraw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            drawFireBall(ballX, ballY);
+        }
+    
+        visited.add(`${ballX},${ballY}`);
+        redraw();
+    });
+    
+</script>
+
+</html>
