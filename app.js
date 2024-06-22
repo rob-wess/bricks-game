@@ -26,11 +26,11 @@ app.get('/bricks', function(req, res) {
 
     const {levels} = brick_data
     if (Object.keys(levels).includes(render_level.toString())) {
-        res.render('bricks', {blocks: levels[requested_level.toString()]})
+        res.render('bricks', {blocks: levels[render_level.toString()]})
         return
     } else {
-        console.error(`Error! Requested level ${requested_level} does not exist`)
-        res.render('bricks', {blocks: JSON.stringify(levels[requested_level.toString()]) })
+        console.error(`Error! Requested level ${render_level} does not exist`)
+        res.render('bricks', {blocks: JSON.stringify(levels[render_level.toString()]) })
         return
     }
 });
